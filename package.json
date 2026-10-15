@@ -1,0 +1,28 @@
+{
+  "name": "bug-tracker-lite",
+  "version": "1.0.0",
+  "description": "Bug Tracker Lite — Full Stack Issue Tracking with React, Node.js, Express, MongoDB, and AWS S3",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:backend:mem": "npm --prefix backend run dev:mem",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "test:backend": "npm --prefix backend test",
+    "test": "npm run test:backend"
+  },
+  "keywords": [
+    "bug-tracker",
+    "full-stack",
+    "react",
+    "nodejs",
+    "express",
+    "mongodb",
+    "mongoose",
+    "aws-s3",
+    "presigned-url"
+  ],
+  "author": "Full Stack Developer Assignment",
+  "license": "MIT"
+}
