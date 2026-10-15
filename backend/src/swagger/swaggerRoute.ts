@@ -250,6 +250,10 @@ const swaggerDocument = {
 };
 
 const router = Router();
+router.get('/json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json(swaggerDocument);
+});
 router.use('/', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 export const swaggerRoute = router;
