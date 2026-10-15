@@ -73,5 +73,7 @@ const BugSchema = new Schema<IBug>(
 
 BugSchema.index({ userId: 1, createdAt: -1 });
 BugSchema.index({ userId: 1, status: 1, createdAt: -1 });
+BugSchema.index({ userId: 1, severity: 1, createdAt: -1 });
+BugSchema.index({ title: 'text', description: 'text' }, { weights: { title: 3, description: 1 } });
 
 export const Bug = model<IBug>('Bug', BugSchema);
