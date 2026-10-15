@@ -1,9 +1,9 @@
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
-function sanitize(data: any): any {
+export function sanitize(data: any): any {
   if (!data || typeof data !== 'object') return data;
   const clone = Array.isArray(data) ? [...data] : { ...data };
-  const sensitiveKeys = ['password', 'token', 'authorization', 'secret', 'key', 'aws_secret_access_key'];
+  const sensitiveKeys = ['password', 'token', 'authorization', 'secret', 'key', 'aws_secret_access_key', 'jwt', 'cookie', 'bearer', 'credential'];
   for (const k of Object.keys(clone)) {
     if (sensitiveKeys.some(s => k.toLowerCase().includes(s))) {
       clone[k] = '[REDACTED]';
