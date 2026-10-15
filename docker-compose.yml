@@ -1,0 +1,57 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: bugtracker-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: bugtracker
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - bugtracker-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: bugtracker-backend
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      PORT: 5001
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongodb:27017/bugtracker
+      JWT_SECRET: your_production_jwt_secret_key_minimum_32_characters
+      JWT_EXPIRES_IN: 1d
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: your-private-bug-tracker-bucket
+      AWS_ACCESS_KEY_ID: your_aws_access_key_id
+      AWS_SECRET_ACCESS_KEY: your_aws_secret_access_key
+      CORS_ORIGIN: http://localhost:3000
+    depends_on:
+      - mongodb
+    networks:
+      - bugtracker-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: bugtracker-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - bugtracker-net
+
+volumes:
+  mongo_data:
+
+networks:
+  bugtracker-net:
+    driver: bridge
