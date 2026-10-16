@@ -22,6 +22,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({
       status: 'error',
+      code: 'UNAUTHORIZED',
       message: 'Authentication required. Missing or malformed Bearer token.',
     });
     return;
