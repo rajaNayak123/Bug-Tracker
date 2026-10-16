@@ -1,566 +1,254 @@
 # Bug Tracker Lite — Full Stack Issue Tracking Platform
 
-A secure, production-grade issue-tracking web application built with **React**, **Node.js**, **Express**, **MongoDB (Mongoose)**, and **AWS S3**. Enables authenticated software developers to create, view, edit, filter, and delete bugs with direct-to-S3 screenshot attachments via secure pre-signed URLs.
+A secure, production-grade issue tracking web application built with **React**, **Node.js**, **Express**, **MongoDB (Mongoose)**, and **AWS S3**. Authenticated software developers can create, list, filter, edit, and delete bugs with direct-to-S3 screenshot attachments via secure pre-signed URLs.
 
-> **Live Deployment (AWS EC2 & S3)**:
-> - **Live Application URL**: [http://35.154.14.223](http://35.154.14.223)
-> - **API Health Check**: [http://35.154.14.223/api/health](http://35.154.14.223/api/health)
-> - **Interactive Swagger Docs**: [http://35.154.14.223/api/docs](http://35.154.14.223/api/docs)
-> - **OpenAPI Schema (JSON)**: [http://35.154.14.223/api/docs/json](http://35.154.14.223/api/docs/json)
+---
+
+## 🌐 Live Deployed URLs
+
+The application is deployed live on AWS (EC2 + S3 + MongoDB Atlas) with an automated GitHub Actions CI/CD pipeline:
+
+| Component | Live URL | Description |
+|---|---|---|
+| **Frontend Web App** | [http://35.154.14.223](http://35.154.14.223) | Complete React user interface (Port 80) |
+| **Backend API Root** | [http://35.154.14.223/api](http://35.154.14.223/api) | Express REST API endpoints |
+| **API Health Check** | [http://35.154.14.223/api/health](http://35.154.14.223/api/health) | Real-time service uptime & database status |
+| **Interactive Swagger Docs** | [http://35.154.14.223/api/docs/](http://35.154.14.223/api/docs/) | Interactive Swagger UI API documentation |
+| **OpenAPI Specification (JSON)** | [http://35.154.14.223/api/docs/json](http://35.154.14.223/api/docs/json) | Raw OpenAPI 3.0 schema |
 
 ---
 
 ## 1. Project Overview
 
-**Bug Tracker Lite** is designed with enterprise security and usability in mind. Key capabilities:
-- Strict **server-side ownership verification**: Users can only view, mutate, or delete their own issues.
-- **Direct-to-S3 pre-signed URL workflow**: Image screenshots bypass the application server entirely during upload, preventing memory leaks and high bandwidth costs.
-- **Zero public bucket access**: AWS S3 buckets remain completely private (`Block Public Access` enabled). Images are viewed exclusively via short-lived pre-signed `GET` URLs (15-minute TTL).
-- **Automated S3 lifecycle cleanup**: Deleting an issue or replacing an attachment automatically removes the stale object from S3, eliminating orphaned files.
-- **Brute-force protection**: Authentication endpoints are rate-limited to 5 requests per minute per IP.
+**Bug Tracker Lite** is built for engineering teams to report, manage, and resolve software bugs securely. 
+
+### Key Capabilities:
+- **Strict Server-Side Ownership Enforcement**: Users can only view, edit, or delete their own bugs. Attempting to query or mutate another user's bug ID strictly returns `403 Forbidden`.
+- **Direct-to-S3 Pre-Signed Uploads**: Screenshots are uploaded directly from the browser to a private S3 bucket using short-lived pre-signed `PUT` URLs. The server never handles raw image streams or base64 blobs, preventing memory exhaustion.
+- **Private S3 Storage & Pre-signed Viewing**: The S3 bucket has "Block all public access" enabled. Images are rendered using temporary pre-signed `GET` URLs (15-minute expiration).
+- **Automated Orphan Cleanup**: Deleting a bug or replacing an image automatically deletes the old file from AWS S3, preventing storage leaks.
+- **Brute-Force Protection**: Signup and login routes are rate-limited to 5 requests per minute per IP, returning standard `429 Too Many Requests`.
 
 ---
 
-## 2. Features
+## 2. Tech Stack
 
-- **Authentication & Authorization**:
-  - Secure registration and login with bcrypt password hashing (salt factor 12).
-  - JWT-based session tokens with configurable expiration.
-  - Rate limiting (5 attempts/minute/IP) returning standard HTTP 429.
-  - Case-insensitive, trimmed, and normalized user email addresses.
-  - Automatic token expiration handling and client redirection.
-- **Bug Management**:
-  - Full CRUD operations scoped strictly to the authenticated user's ID.
-  - Severity categories: `low`, `med`, and `high`.
-  - Status progression: `open`, `in-progress`, and `closed`.
-  - Server-side status filtering (`GET /api/bugs?status=open`) and keyword search.
-  - Protection of immutable database fields (`_id`, `userId`, `createdAt`, `updatedAt`).
-- **AWS S3 Integration**:
-  - Pre-signed `PUT` URLs generated dynamically with 5-minute expiration.
-  - Pre-signed `GET` URLs generated with 15-minute expiration for viewing.
-  - Strict client and server-side validation: Allowed types (`.jpg`, `.jpeg`, `.png`, `.webp`), max size 5 MB.
-  - Automated deletion of S3 objects on issue deletion or image replacement.
-- **Developer-Centric UI**:
-  - Modern, responsive dark slate interface built with React.
-  - Real-time statistics counters (Total, Open, In Progress, Closed).
-  - Filter pills and instant search.
-  - Direct S3 upload with progress bar.
-  - Delete confirmation modal.
+- **Frontend**: React 18, TypeScript, Vite, Lucide Icons, Vanilla CSS design system.
+- **Backend**: Node.js, Express 4, TypeScript, Zod (schema validation), Helmet (HTTP security headers), Morgan & custom structured JSON logger.
+- **Database**: MongoDB with Mongoose ODM (compound indexes & full-text search index).
+- **Authentication**: JWT (`jsonwebtoken`) and bcrypt password hashing (12 salt rounds).
+- **Cloud Storage**: AWS S3 (`@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`).
+- **Deployment**: AWS EC2 (Ubuntu 24.04 LTS), Docker, Docker Compose, Nginx reverse proxy.
+- **CI/CD**: GitHub Actions (automated testing, build verification, and zero-downtime SSH deployment).
+- **Testing**: Jest, Supertest, and `mongodb-memory-server` (31 automated tests).
 
 ---
 
-## 3. Technology Stack
+## 3. Local Setup Instructions
 
-| Layer | Technologies |
-|---|---|
-| **Frontend** | React 18, TypeScript, Vite, Lucide React, Custom CSS Design System |
-| **Backend** | Node.js (v20+ / v22+), Express 4, TypeScript, Helmet, CORS, Morgan |
-| **Database** | MongoDB with Mongoose ODM |
-| **File Storage** | AWS S3 (`@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`) |
-| **Authentication** | JWT (`jsonwebtoken`), Password Hashing (`bcryptjs`) |
-| **Validation** | Zod (strict schema validation for params, query, and body) |
-| **Documentation** | Swagger / OpenAPI 3.0 (`swagger-ui-express`) at `/api/docs` |
-| **Testing** | Jest, Supertest, `mongodb-memory-server` |
-| **DevOps** | Docker, Multi-stage Dockerfiles, Docker Compose, Nginx |
+### Prerequisites
+- Node.js 20+ installed (`node -v`)
+- npm 10+ installed (`npm -v`)
+- Git installed
 
----
-
-## 4. Architecture Overview
-
-### High-Level Architecture Diagram
-
-```
-+---------------------------------------------------------------------------------+
-|                                 CLIENT BROWSER                                  |
-|   (React 18 SPA: Dashboard, Create Bug, Bug Detail, Edit Bug, Auth Forms)      |
-+-------------------+------------------------------------+------------------------+
-                    |                                    |
-     1. REST API    |                     3. Direct PUT  |  4. Pre-signed GET
-        (JWT Auth)  |                        (Upload)    |     (View Image)
-                    v                                    v
-+-------------------+-----------------+        +---------+------------------------+
-|           EXPRESS BACKEND           |        |          AWS S3 BUCKET           |
-|  - Rate Limiter (5 req/min)         |        |  - Private Bucket (Block Public) |
-|  - Helmet & Security Headers        |        |  - Encrypted (SSE-S3)            |
-|  - Zod Request Validation           |        |  - CORS for direct PUT           |
-|  - Server-Side Ownership Check      |        +----------------------------------+
-|  - S3 Pre-signed URL Generator      |                          ^
-+-------------------+-----------------+                          |
-                    |                                            |
-                    | Mongoose ODM                               | Delete on cleanup
-                    v                                            |
-+-------------------+-----------------+                          |
-|         MONGODB DATABASE            |--------------------------+
-|  - Users Collection (Unique Email)  |
-|  - Bugs Collection (Indexed queries)|
-+-------------------------------------+
-```
-
-### Direct S3 Pre-Signed Upload Flow
-
-```
-Client (Browser)             Express Backend                   AWS S3
-      |                             |                             |
-      | 1. Select image (<5MB)      |                             |
-      |---------------------------->|                             |
-      |    POST /api/bugs/upload-url|                             |
-      |    {fileName, fileType}     |                             |
-      |                             | 2. Validate MIME & Size     |
-      |                             |    Generate PutObjectCommand|
-      |                             |    Sign URL (expires: 300s) |
-      |                             |                             |
-      | 3. Return uploadUrl & key   |                             |
-      |<----------------------------|                             |
-      |                             |                             |
-      | 4. Direct HTTP PUT to S3 with Content-Type header         |
-      |---------------------------------------------------------->|
-      |    (Bypasses application server completely)               |
-      |<----------------------------------------------------------|
-      |    HTTP 200 OK                                            |
-      |                             |                             |
-      | 5. POST /api/bugs           |                             |
-      |    {title, ..., imageKey}   |                             |
-      |---------------------------->|                             |
-      |                             | 6. Persist bug in MongoDB   |
-      |<----------------------------|                             |
-      |    HTTP 201 Created         |                             |
-```
-
----
-
-## 5. Project Structure
-
-```
-Bug-Tracker/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   ├── env.ts              # Validated environment configuration
-│   │   │   ├── db.ts               # Mongoose connection & lifecycle
-│   │   │   └── s3.ts               # AWS S3 client setup
-│   │   ├── controllers/
-│   │   │   ├── authController.ts   # Signup, login, profile logic
-│   │   │   ├── bugController.ts    # Bug CRUD + ownership verification
-│   │   │   ├── healthController.ts # System & DB health endpoint
-│   │   │   └── uploadController.ts # Pre-signed S3 upload URL handler
-│   │   ├── middleware/
-│   │   │   ├── authMiddleware.ts   # JWT validation & user extraction
-│   │   │   ├── errorHandler.ts     # Centralized error handler
-│   │   │   ├── rateLimiter.ts      # Auth rate limiter (5 req/min)
-│   │   │   └── validate.ts         # Zod schemas & validator middleware
-│   │   ├── models/
-│   │   │   ├── User.ts             # Mongoose User model with unique index
-│   │   │   └── Bug.ts              # Mongoose Bug model with compound indexes
-│   │   ├── routes/
-│   │   │   ├── authRoutes.ts       # /api/auth routes
-│   │   │   └── bugRoutes.ts        # /api/bugs routes
-│   │   ├── services/
-│   │   │   └── s3Service.ts        # Pre-signed PUT/GET & S3 deletion
-│   │   ├── swagger/
-│   │   │   └── swaggerRoute.ts     # OpenAPI 3.0 UI definition
-│   │   ├── utils/
-│   │   │   └── logger.ts           # Structured logging with sensitive data redaction
-│   │   ├── app.ts                  # Express application configuration
-│   │   ├── server.ts               # Production server listener
-│   │   └── devServer.ts            # Self-contained dev server with memory DB
-│   ├── tests/
-│   │   ├── auth.test.ts            # Signup, login, password hash, JWT tests
-│   │   ├── bugs.test.ts            # CRUD, ownership check, filter, S3 cleanup tests
-│   │   ├── rateLimit.test.ts       # 429 rate limit tests
-│   │   ├── s3.test.ts              # S3 pre-signed URL & validation tests
-│   │   └── setup.ts                # In-memory Mongo test database setup
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── jest.config.js
-├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── client.ts           # API client, 401 interceptor & S3 direct upload
-│   │   ├── components/
-│   │   │   ├── DeleteModal.tsx     # Delete confirmation modal
-│   │   │   ├── ImageUploader.tsx   # Pre-signed upload component with progress
-│   │   │   ├── Navbar.tsx          # Responsive navigation header
-│   │   │   ├── SeverityBadge.tsx   # Severity indicator pill
-│   │   │   └── StatusBadge.tsx     # Status indicator pill
-│   │   ├── context/
-│   │   │   └── AuthContext.tsx     # Authentication context provider
-│   │   ├── pages/
-│   │   │   ├── AuthPage.tsx        # Registration and Login forms
-│   │   │   ├── BugDetailPage.tsx   # Full details view with pre-signed GET image
-│   │   │   ├── CreateBugPage.tsx   # Bug creation form
-│   │   │   ├── DashboardPage.tsx   # Bug list, metrics, status filters, search
-│   │   │   └── EditBugPage.tsx     # Edit form with image replacement
-│   │   ├── styles/
-│   │   │   └── index.css           # Vanilla CSS modern design system
-│   │   ├── types/
-│   │   │   └── index.ts            # TypeScript interfaces
-│   │   ├── App.tsx                 # Main application with hash routing
-│   │   └── main.tsx                # React DOM entry
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── Dockerfile.backend
-├── Dockerfile.frontend
-├── docker-compose.yml
-├── nginx.conf
-├── .env.example
-├── README.md
-└── NOTES.md
-```
-
----
-
-## 6. Prerequisites
-
-- **Node.js**: v20.x or v22.x
-- **npm**: v10.x+
-- **MongoDB**: Local MongoDB instance or MongoDB Atlas cluster (optional in dev, as embedded in-memory MongoDB is built-in).
-- **AWS Account** (optional for local mock testing; required for live deployment): An S3 bucket and IAM credentials with PutObject, GetObject, and DeleteObject permissions.
-
----
-
-## 7. Local Setup Instructions
-
-### Step 1: Clone the Repository
+### 1. Clone the repository
 ```bash
 git clone https://github.com/rajaNayak123/Bug-Tracker.git
 cd Bug-Tracker
 ```
 
-### Step 2: Install Dependencies
+### 2. Install dependencies
 Install dependencies for both backend and frontend:
 ```bash
-# In backend
-cd backend && npm install
-
-# In frontend
-cd ../frontend && npm install
+npm --prefix backend install
+npm --prefix frontend install
 ```
 
-### Step 3: Configure Environment Variables
-Create `.env` file in the `backend/` directory:
+---
+
+## 4. Environment Variables Required
+
+### Root / Backend Environment Variables (`backend/.env`):
+Create a `.env` file inside `backend/` (or copy from `backend/.env.example`):
+
 ```bash
-cp .env.example backend/.env
-```
-*(Optionally adjust parameters such as `PORT`, `MONGODB_URI`, `JWT_SECRET`, and `AWS_S3_BUCKET`).*
+# Server Configuration
+PORT=5001
+NODE_ENV=development
 
----
+# Database Connection (MongoDB URI or Atlas connection string)
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxx.mongodb.net/Bug-Tracker
 
-## 8. MongoDB Setup
+# JWT Secret & Expiration
+JWT_SECRET=super_secret_jwt_key_at_least_32_characters_long
+JWT_EXPIRES_IN=1d
 
-You can connect Bug Tracker Lite to either **MongoDB Atlas** or a **local MongoDB instance**:
+# AWS S3 Private Storage
+AWS_REGION=ap-south-1
+AWS_S3_BUCKET=your-private-bucket-name
+AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXXXXXXXX
+AWS_SECRET_ACCESS_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-### Option A: MongoDB Atlas (Cloud)
-1. Create a free M0 cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas).
-2. Under **Database Access**, create a database user with read/write privileges.
-3. Under **Network Access**, add `0.0.0.0/0` (or your EC2/local IP address).
-4. Click **Connect -> Connect your application** and copy the URI string:
-   ```env
-   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/bugtracker?retryWrites=true&w=majority
-   ```
-
-### Option B: Local MongoDB
-Ensure `mongod` is running on port 27017:
-```env
-MONGODB_URI=mongodb://localhost:27017/bugtracker
+# Security & CORS
+CORS_ORIGIN=http://localhost:3000
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=5
 ```
 
-### Option C: Zero-Config In-Memory Database (Development)
-The project includes a ready-to-run in-memory MongoDB server:
+### Frontend Environment Variables (`frontend/.env`):
+Optional for local development. Defaults to `/api` proxy in Vite:
 ```bash
-cd backend && npm run dev:mem
+VITE_API_URL=http://localhost:5001
 ```
-*(Requires no local MongoDB installation or cloud connection; perfect for rapid evaluation!)*
 
 ---
 
-## 9. Environment Variable Reference
+## 5. Database Setup
 
-| Variable | Default (Dev) | Description |
-|---|---|---|
-| `PORT` | `5001` | Express backend listening port |
-| `NODE_ENV` | `development` | Environment mode (`development`, `production`, `test`) |
-| `MONGODB_URI` | `mongodb://localhost:27017/bugtracker` | Connection string to MongoDB instance |
-| `JWT_SECRET` | *(dev fallback provided)* | 32+ character cryptographically secure secret |
-| `JWT_EXPIRES_IN` | `1d` | Token lifetime (e.g., `1d`, `12h`, `7d`) |
-| `AWS_REGION` | `us-east-1` | AWS region where S3 bucket resides |
-| `AWS_S3_BUCKET` | `bug-tracker-lite-attachments` | Name of the private S3 bucket |
-| `AWS_ACCESS_KEY_ID` | *(IAM credential)* | AWS Access Key ID |
-| `AWS_SECRET_ACCESS_KEY` | *(IAM credential)* | AWS Secret Access Key |
-| `CORS_ORIGIN` | `http://localhost:3000` | Allowed frontend origin for CORS |
-| `RATE_LIMIT_WINDOW_MS`| `60000` | Rate limiter window duration in milliseconds (1 min) |
-| `RATE_LIMIT_MAX` | `5` | Maximum auth attempts allowed per IP per window |
-| `VITE_API_URL` | `http://localhost:5001` | Frontend target URL for API requests |
+You can use either **Local MongoDB** or **MongoDB Atlas** (Cloud):
+
+### Option A: MongoDB Atlas (Recommended for Production)
+1. Create a free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+2. Create a free **M0 Cluster**.
+3. Under **Database Access**, create a database user with password.
+4. Under **Network Access**, add IP `0.0.0.0/0` (allow access from anywhere).
+5. Click **Connect** → **Drivers** and copy your connection URI into `backend/.env` under `MONGODB_URI`.
+
+### Option B: Zero-Config In-Memory Database (Fastest for Local Testing)
+You can run the backend without installing MongoDB at all! An embedded MongoDB server will spin up in RAM automatically:
+```bash
+npm --prefix backend run dev:mem
+```
 
 ---
 
-## 10. Startup Commands
+## 6. AWS / S3 Configuration
 
-### Run Locally (Development)
+### 1. Create a Private S3 Bucket
+1. Open the **AWS S3 Console** and click **Create bucket**.
+2. Give it a globally unique name (e.g. `bugtracker-attachments-<yourname>`).
+3. Select your desired AWS Region (e.g. `ap-south-1` or `us-east-1`).
+4. Ensure **"Block all public access"** is checked ✅.
+5. Click **Create bucket**.
 
-**Terminal 1 — Backend (with auto-spinning MongoDB):**
+### 2. Configure S3 CORS
+To allow browser-to-S3 direct uploads:
+1. Click your bucket name → **Permissions** tab.
+2. Scroll to **Cross-origin resource sharing (CORS)** and paste:
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+### 3. IAM User Credentials
+Create an IAM User with `AmazonS3FullAccess` (or scoped to your bucket) and generate an **Access Key ID** & **Secret Access Key**. Place these in your `backend/.env`.
+
+---
+
+## 7. How to Run Frontend and Backend
+
+### Development Mode
+
+**Terminal 1 — Backend:**
 ```bash
 cd backend
+npm run dev
+# OR for zero-setup in-memory database:
 npm run dev:mem
 ```
-*Backend runs at `http://localhost:5001` with Swagger docs at `http://localhost:5001/api/docs`.*
+*Backend runs on `http://localhost:5001`.*
 
 **Terminal 2 — Frontend:**
 ```bash
 cd frontend
 npm run dev
 ```
-*Frontend runs at `http://localhost:3000`.*
+*Frontend runs on `http://localhost:3000`.*
 
-### Run via Docker Compose
-To launch MongoDB, Backend, and Frontend containers simultaneously:
+### Run Using Docker Compose (Full Stack)
 ```bash
-docker-compose up --build
+docker compose up -d --build
 ```
 - Frontend: `http://localhost:3000`
 - Backend API: `http://localhost:5001/api`
-- API Documentation: `http://localhost:5001/api/docs`
+- Swagger UI: `http://localhost:5001/api/docs/`
 
 ---
 
-## 11. API Endpoint Documentation
+## 8. API Details
 
-Live interactive Swagger / OpenAPI UI is accessible at:
-```
-http://localhost:5001/api/docs
-```
-
-### Summary of Endpoints
+All routes are prefixed with `/api`. Protected routes require the `Authorization: Bearer <token>` header.
 
 | Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/health` | No | Health check (reports DB & system status) |
-| `POST` | `/api/auth/signup` | Rate-Limited | Register new user account |
-| `POST` | `/api/auth/login` | Rate-Limited | Authenticate and obtain JWT token |
-| `GET` | `/api/auth/me` | JWT | Get current authenticated user profile |
-| `POST` | `/api/bugs/upload-url` | JWT | Request pre-signed S3 upload PUT URL |
-| `GET` | `/api/bugs` | JWT | List bugs belonging to user (supports `?status=`) |
-| `POST` | `/api/bugs` | JWT | Create a new bug associated with user |
-| `GET` | `/api/bugs/:id` | JWT | Get bug details with pre-signed GET image URL |
-| `PUT` | `/api/bugs/:id` | JWT | Update bug (server ownership enforced) |
-| `DELETE`| `/api/bugs/:id` | JWT | Delete bug and remove image from S3 |
+|---|---|:---:|---|
+| `GET` | `/api/health` | No | Check server uptime and database connectivity |
+| `POST` | `/api/auth/signup` | No | Register new user with hashed password (Rate limited: 5 req/min) |
+| `POST` | `/api/auth/login` | No | Authenticate user and return signed JWT (Rate limited: 5 req/min) |
+| `POST` | `/api/bugs/upload-url` | **Yes** | Request short-lived pre-signed S3 PUT URL for screenshot upload |
+| `GET` | `/api/bugs` | **Yes** | List authenticated user's bugs (Supports `?status=open\|in-progress\|closed`) |
+| `POST` | `/api/bugs` | **Yes** | Create a new bug report with optional S3 imageKey |
+| `GET` | `/api/bugs/:id` | **Yes** | Get bug details with pre-signed GET image URL (Strict ownership check) |
+| `PUT` | `/api/bugs/:id` | **Yes** | Update bug fields and cleanup old S3 image on replacement |
+| `DELETE` | `/api/bugs/:id` | **Yes** | Delete bug and remove associated image from AWS S3 |
 
-### Example Requests & Responses
-
-#### 1. Register User (`POST /api/auth/signup`)
-```bash
-curl -X POST http://localhost:5001/api/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Jane Developer",
-    "email": "jane@example.com",
-    "password": "Password123!"
-  }'
-```
-**Response (201 Created):**
-```json
-{
-  "status": "success",
-  "message": "Account created successfully",
-  "data": {
-    "user": {
-      "id": "6ad0f1f5ab7c9a309ee06a54",
-      "name": "Jane Developer",
-      "email": "jane@example.com",
-      "createdAt": "2026-10-15T15:32:05.333Z"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  }
-}
-```
-
-#### 2. Request S3 Pre-signed Upload URL (`POST /api/bugs/upload-url`)
-```bash
-curl -X POST http://localhost:5001/api/bugs/upload-url \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "fileName": "crash_screenshot.png",
-    "fileType": "image/png",
-    "fileSize": 524288
-  }'
-```
-**Response (200 OK):**
-```json
-{
-  "status": "success",
-  "message": "Pre-signed S3 upload URL generated successfully",
-  "data": {
-    "uploadUrl": "https://bug-tracker-lite-attachments.s3.us-east-1.amazonaws.com/bugs/6ad0.../123-crash_screenshot.png?X-Amz-Algorithm=...",
-    "imageKey": "bugs/6ad0f1f5ab7c9a309ee06a54/82fb65fa-crash_screenshot.png",
-    "expiresIn": 300,
-    "requiredHeaders": {
-      "Content-Type": "image/png"
-    }
-  }
-}
-```
-
-#### 3. Create Bug (`POST /api/bugs`)
-```bash
-curl -X POST http://localhost:5001/api/bugs \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Dropdown overlaps modal footer",
-    "description": "When opening multi-select in Safari, z-index causes overlay clipping.",
-    "severity": "med",
-    "status": "open",
-    "imageKey": "bugs/6ad0f1f5ab7c9a309ee06a54/82fb65fa-crash_screenshot.png"
-  }'
-```
+*Interactive testing is available via Swagger at [http://35.154.14.223/api/docs/](http://35.154.14.223/api/docs/).*
 
 ---
 
-## 12. AWS S3 Bucket, IAM, and CORS Configuration
+## 9. Deployment Details
 
-### 1. S3 Bucket Privacy (Mandatory)
-- Create bucket: `my-private-bug-tracker-bucket`.
-- **Block Public Access**: Enable all 4 settings (`BlockPublicAcls`, `IgnorePublicAcls`, `BlockPublicPolicy`, `RestrictPublicBuckets`).
-- **Bucket Encryption**: Enable SSE-S3 (AES-256).
-
-### 2. S3 CORS Configuration
-In AWS Console -> S3 -> Your Bucket -> **Permissions** -> **Cross-origin resource sharing (CORS)**, save:
-```json
-[
-  {
-    "AllowedHeaders": [
-      "*"
-    ],
-    "AllowedMethods": [
-      "PUT",
-      "GET"
-    ],
-    "AllowedOrigins": [
-      "http://localhost:3000",
-      "https://your-production-domain.com"
-    ],
-    "ExposeHeaders": [
-      "ETag"
-    ],
-    "MaxAgeSeconds": 3600
-  }
-]
+### Infrastructure Architecture (AWS EC2 + S3 + MongoDB Atlas)
+```
+[User Browser]
+       │
+       ▼
+ [AWS EC2 Instance (t3.micro - Ubuntu 24.04)]
+ ┌────────────────────────────────────────────────────────┐
+ │ Nginx (Port 80): Serves React Production SPA           │
+ │ Reverse Proxy  : Forwards `/api/*` to Node.js (5001)   │
+ └────────────────────────────┬───────────────────────────┘
+                              │
+               ┌──────────────┴──────────────┐
+               ▼                             ▼
+    [MongoDB Atlas (Free M0)]    [Private AWS S3 Bucket]
+    (Cloud Database)             (Pre-signed Direct Uploads)
 ```
 
-### 3. Least-Privilege IAM Policy
-Create an IAM user or role attached to your EC2 instance with the following minimal policy:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowBugTrackerS3Actions",
-      "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:GetObject",
-        "s3:DeleteObject"
-      ],
-      "Resource": "arn:aws:s3:::my-private-bug-tracker-bucket/*"
-    }
-  ]
-}
-```
+### Automated CI/CD Pipeline (GitHub Actions)
+Located in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+1. **Continuous Integration (CI)**:
+   - Triggers on every push and pull request to `main`.
+   - Runs backend TypeScript compilation and 31 automated tests.
+   - Runs frontend TypeScript type checking and Vite production bundling.
+   - Verifies Docker Compose configuration and container builds.
+2. **Continuous Deployment (CD)**:
+   - On successful merge to `main`, securely connects to the EC2 server via SSH (`appleboy/ssh-action`).
+   - Pulls the latest commit (`git pull origin main`).
+   - Automatically rebuilds and re-launches Docker containers (`docker compose up -d --build`).
+   - Validates live server health with an automated curl check against `/api/health`.
 
 ---
 
-## 13. Pre-Signed URL Upload Flow
+## 10. Automated Tests
 
-1. **Validation on Client**: Before requesting an upload URL, the browser checks that the file is an image (`.jpg`, `.jpeg`, `.png`, `.webp`) and is `<= 5 MB`.
-2. **URL Generation**: The client calls `POST /api/bugs/upload-url` with `{ fileName, fileType, fileSize }`.
-3. **Backend Signing**: The server validates the metadata and issues a signed `PUT` URL with a 5-minute TTL, scoping the object path under `bugs/${userId}/${uuidv4()}-${cleanFileName}`.
-4. **Direct Browser-to-S3 Upload**: The browser makes an HTTP `PUT` request directly to S3 with the image binary and `Content-Type`.
-5. **Associating Object Key**: Once the upload completes, the returned `imageKey` is stored alongside the bug record in MongoDB.
-6. **Viewing**: When fetching bug details, the backend signs a temporary `GET` URL (15-minute TTL) allowing authorized viewing without ever making the S3 bucket public.
-
----
-
-## 14. AWS Deployment Steps
-
-### Option A: AWS EC2 (Single or Split Instance) — Cost-Conscious & Recommended
-1. **Launch EC2 Instance**:
-   - Instance type: `t4g.small` or `t3.micro` (AWS Free Tier eligible).
-   - OS: Ubuntu 22.04 LTS or Amazon Linux 2023.
-   - Attach IAM Role with S3 permissions (avoids embedding access keys on the instance!).
-2. **Install Node.js & Process Manager**:
-   ```bash
-   sudo apt update && sudo apt install -y nodejs npm nginx git
-   sudo npm install -g pm2
-   ```
-3. **Clone and Build**:
-   ```bash
-   git clone https://github.com/rajaNayak123/Bug-Tracker.git /var/www/bug-tracker
-   cd /var/www/bug-tracker/backend
-   npm install && npm run build
-   cd /var/www/bug-tracker/frontend
-   npm install && npm run build
-   ```
-4. **Configure PM2**:
-   ```bash
-   cd /var/www/bug-tracker/backend
-   pm2 start dist/server.js --name "bug-tracker-api" -i max
-   pm2 startup && pm2 save
-   ```
-5. **Configure Nginx**:
-   Use `nginx.conf` to serve `/var/www/bug-tracker/frontend/dist` on port 80/443 and proxy `/api/` to `http://127.0.0.1:5001`.
-6. **Configure SSL**:
-   Run `sudo certbot --nginx` to obtain free Let's Encrypt HTTPS certificates.
-
-### Option B: S3 + CloudFront (Frontend) and AWS Elastic Beanstalk (Backend)
-- Deploy the frontend `dist/` directory to an S3 static bucket behind AWS CloudFront.
-- Deploy the backend directory to Elastic Beanstalk (Node.js platform) configured with environment variables in the AWS Management Console.
-
----
-
-## 15. Testing Instructions
-
-### Run the Automated Test Suite
-The automated test suite runs in-band with isolated in-memory MongoDB instances and mocks external S3 calls:
-
+Run the backend automated test suite:
 ```bash
 cd backend
 npm test
 ```
 
-### Coverage of Automated Tests
-- **`auth.test.ts`**:
-  - Successful user signup and password hashing verification.
-  - Case-insensitive duplicate email rejection (409 Conflict).
-  - Validation failures for short passwords or invalid emails.
-  - Credential verification and JWT issuance on login.
-  - Rejection of invalid credentials.
-  - Rejection of missing, malformed, or expired JWTs.
-- **`bugs.test.ts`**:
-  - Bug creation and user association.
-  - Scoped listing ensuring users cannot see other users' bugs.
-  - Status filtering (`?status=open`, `?status=closed`).
-  - **Ownership validation**: Verifies that User B receives `403 Forbidden` when attempting to GET, PUT, or DELETE User A's issue.
-  - Invalid MongoDB ObjectId validation (`400 Bad Request`).
-  - Image cleanup: Replacing an image deletes the old image from S3.
-  - Bug deletion: Deleting a bug deletes the database record and calls S3 delete.
-- **`rateLimit.test.ts`**:
-  - Verifies that after 5 authentication attempts in 1 minute, subsequent attempts return `HTTP 429 Too Many Requests`.
-- **`s3.test.ts`**:
-  - Validates pre-signed URL generation.
-  - Rejects invalid MIME types (`application/pdf`, `image/gif`).
-  - Rejects files exceeding 5 MB limit.
-
----
-
-## 16. Known Limitations and Troubleshooting
-
-1. **Local Port 5000 Conflict on macOS**:
-   On macOS Monterey/Ventura/Sonoma/Sequoia, the native AirPlay Receiver listens on port 5000 by default. To prevent collision, Bug Tracker Lite defaults to port `5001`.
-2. **CORS on S3 Direct Upload**:
-   If direct uploads fail with a network error, ensure your S3 bucket CORS policy includes the client origin (`http://localhost:3000` or production URL) with the `PUT` method allowed.
-3. **Database Connection Failures**:
-   If connecting to MongoDB Atlas, ensure your IP address is whitelisted under Atlas Network Access (`0.0.0.0/0` for initial testing).
-4. **Token Storage Security**:
-   Tokens are stored in `localStorage` for simplicity in single-page applications. For banking-grade security, refer to `NOTES.md` for discussion on moving to `httpOnly` secure cookies.
+### Test Results: 31/31 Passing Across 7 Test Suites
+- `bugs.test.ts`: CRUD operations, status filters, and **403 Forbidden security ownership isolation**.
+- `auth.test.ts`: Signup, login, password hashing, duplicate email rejection, JWT expiry.
+- `s3.test.ts`: Pre-signed URL generation, file type whitelisting, 5MB file size limit.
+- `rateLimit.test.ts`: Verifies HTTP 429 Too Many Requests response on rate limit breach.
+- `health.test.ts`: Verifies health check returns healthy status and database connection.
+- `swagger.test.ts`: Verifies Swagger UI HTML and raw OpenAPI 3.0 JSON endpoints.
+- `logger.test.ts`: Verifies structured JSON logging and automatic redaction of sensitive credentials.
