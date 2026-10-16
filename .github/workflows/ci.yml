@@ -69,3 +69,23 @@ jobs:
 
       - name: Build Docker Images
         run: docker compose build
+
+  deploy-to-ec2:
+    name: Continuous Deployment (CD) to AWS EC2
+    needs: [backend-ci, frontend-ci, docker-verification]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        if: "${{ secrets.EC2_SSH_KEY != '' }}"
+        with:
+          host: ${{ secrets.EC2_HOST || '35.154.14.223' }}
+          username: ${{ secrets.EC2_USER || 'ubuntu' }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            git pull origin main
+            docker compose up -d --build
+            sleep 8
+            curl -f http://localhost/api/health || exit 1
