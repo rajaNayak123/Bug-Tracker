@@ -2,6 +2,12 @@
 
 A secure, production-grade issue-tracking web application built with **React**, **Node.js**, **Express**, **MongoDB (Mongoose)**, and **AWS S3**. Enables authenticated software developers to create, view, edit, filter, and delete bugs with direct-to-S3 screenshot attachments via secure pre-signed URLs.
 
+> **Live Deployment (AWS EC2 & S3)**:
+> - **Live Application URL**: [http://35.154.14.223](http://35.154.14.223)
+> - **API Health Check**: [http://35.154.14.223/api/health](http://35.154.14.223/api/health)
+> - **Interactive Swagger Docs**: [http://35.154.14.223/api/docs](http://35.154.14.223/api/docs)
+> - **OpenAPI Schema (JSON)**: [http://35.154.14.223/api/docs/json](http://35.154.14.223/api/docs/json)
+
 ---
 
 ## 1. Project Overview
